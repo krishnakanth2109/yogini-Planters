@@ -18,19 +18,6 @@ export function getFirebaseAdmin() {
   if (admin.apps.length) {
     return admin;
   }
-
-  const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
-  if (serviceAccountPath) {
-    const resolvedPath = path.resolve(__dirname, "..", serviceAccountPath);
-    const serviceAccount = JSON.parse(fs.readFileSync(resolvedPath, "utf8"));
-
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-    });
-
-    return admin;
-  }
-
   admin.initializeApp({
     credential: admin.credential.cert({
       projectId: requiredEnv("FIREBASE_PROJECT_ID"),

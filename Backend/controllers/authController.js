@@ -25,8 +25,26 @@ async function signInWithPassword(email, password) {
 
   const data = await response.json();
   if (!response.ok) {
-    const error = new Error(data.error?.message || "Firebase login failed");
-    error.status = 401;
+    const firebaseCode = data.error?.message || "FIREBASE_LOGIN_FAILED";
+    const loginMessages = {
+      CONFIGURATION_NOT_FOUND:
+        "Firebase Authentication is not enabled for this project. Open Firebase Console > Authentication, click Get started, and enable Email/Password sign-in.",
+      EMAIL_NOT_FOUND:
+        "No Firebase user exists for this email. Run the seed script after Firebase Authentication is enabled, or register this user first.",
+      INVALID_LOGIN_CREDENTIALS: "Invalid email or password.",
+      INVALID_PASSWORD: "Invalid email or password.",
+      EMAIL_PASSWORD_SIGN_IN_DISABLED:
+        "Email/Password sign-in is disabled in Firebase Authentication. Enable it in Firebase Console > Authentication > Sign-in method.",
+      PASSWORD_LOGIN_DISABLED:
+        "Email/Password sign-in is disabled in Firebase Authentication. Enable it in Firebase Console > Authentication > Sign-in method.",
+      INVALID_API_KEY: "FIREBASE_WEB_API_KEY is invalid. Check Backend/.env against your Firebase web app config.",
+    };
+
+    const error = new Error(loginMessages[firebaseCode] || `Firebase login failed: ${firebaseCode}`);
+    error.status = ["EMAIL_NOT_FOUND", "INVALID_LOGIN_CREDENTIALS", "INVALID_PASSWORD"].includes(firebaseCode)
+      ? 401
+      : 400;
+    error.code = firebaseCode;
     throw error;
   }
 

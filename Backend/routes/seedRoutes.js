@@ -332,9 +332,10 @@ async function verifyFirebaseCredentials() {
     await firebaseAdmin.auth().listUsers(1);
   } catch (error) {
     const hint = [
-      "Firebase Admin credentials are invalid.",
-      "Generate a fresh service account key in Firebase Console > Project settings > Service accounts.",
-      "Then replace FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY in Backend/.env.",
+      "Firebase Auth is not ready for this project.",
+      "Open Firebase Console > Authentication and click Get started.",
+      "Then enable the Email/Password sign-in provider.",
+      "If Authentication is already enabled, confirm FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY all belong to the same Firebase project.",
       `Original Firebase error: ${error.message}`,
     ].join(" ");
 

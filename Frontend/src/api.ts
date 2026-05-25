@@ -1,6 +1,10 @@
 import axios from "axios";
 
 type Role = "admin" | "customer";
+type ApiErrorBody = {
+  message?: string;
+  code?: string;
+};
 
 export interface ApiUser {
   id?: string;
@@ -52,6 +56,11 @@ api.interceptors.response.use(
       sessionStorage.removeItem("yp_auth_user");
       sessionStorage.removeItem("yp_auth_token");
       window.dispatchEvent(new Event("yp-auth-change"));
+    }
+
+    const apiError = error.response?.data as ApiErrorBody | undefined;
+    if (apiError?.message) {
+      return Promise.reject(new Error(apiError.code ? `${apiError.message} (${apiError.code})` : apiError.message));
     }
 
     return Promise.reject(error);
