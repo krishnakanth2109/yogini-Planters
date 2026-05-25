@@ -3,7 +3,15 @@ import dotenv from "dotenv";
 import express from "express";
 import { connectDB } from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
+import bookingRoutes from "./routes/bookingRoutes.js";
+import libraryRoutes from "./routes/libraryRoutes.js";
+import { maintenancePlanRouter, subscriptionRouter } from "./routes/maintenanceRoutes.js";
+import reviewRoutes from "./routes/reviewRoutes.js";
 import seedRoutes from "./routes/seedRoutes.js";
+import serviceRoutes from "./routes/serviceRoutes.js";
+import uploadRoutes from "./routes/uploadRoutes.js";
+import wellnessRoutes from "./routes/wellnessRoutes.js";
+import wishlistRoutes from "./routes/wishlistRoutes.js";
 
 dotenv.config();
 
@@ -32,7 +40,16 @@ app.get("/api/health", (_req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
+app.use("/api/services", serviceRoutes);
+app.use("/api/bookings", bookingRoutes);
+app.use("/api/maintenance-plans", maintenancePlanRouter);
+app.use("/api/subscriptions", subscriptionRouter);
+app.use("/api/wellness-tickets", wellnessRoutes);
+app.use("/api/library", libraryRoutes);
+app.use("/api/wishlist", wishlistRoutes);
+app.use("/api/reviews", reviewRoutes);
 app.use("/api/seed", seedRoutes);
+app.use("/api/uploads", uploadRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ message: `Route not found: ${req.method} ${req.originalUrl}` });

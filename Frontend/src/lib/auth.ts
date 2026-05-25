@@ -14,6 +14,7 @@ export interface User {
 
 const USER_KEY = "yp_auth_user";
 const TOKEN_KEY = "yp_auth_token";
+const REFRESH_TOKEN_KEY = "yp_auth_refresh_token";
 
 function emitAuthChange() {
   window.dispatchEvent(new Event("yp-auth-change"));
@@ -22,6 +23,9 @@ function emitAuthChange() {
 function saveSession(session: AuthResponse) {
   sessionStorage.setItem(USER_KEY, JSON.stringify(session.user));
   sessionStorage.setItem(TOKEN_KEY, session.token);
+  if (session.refreshToken) {
+    sessionStorage.setItem(REFRESH_TOKEN_KEY, session.refreshToken);
+  }
   emitAuthChange();
 }
 
@@ -65,6 +69,7 @@ export function logout() {
   if (typeof window !== "undefined") {
     sessionStorage.removeItem(USER_KEY);
     sessionStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(REFRESH_TOKEN_KEY);
     emitAuthChange();
   }
 }

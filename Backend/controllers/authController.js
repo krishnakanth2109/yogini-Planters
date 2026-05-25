@@ -1,20 +1,72 @@
-import jwt from "jsonwebtoken";
+import { firebaseAdmin } from "../config/firebase.js";
 import User from "../models/User.js";
 
-function signToken(user) {
-  return jwt.sign(
-    {
-      sub: user._id.toString(),
-      role: user.role,
-    },
-    process.env.JWT_SECRET,
-    { expiresIn: "7d" },
-  );
+function requireWebApiKey() {
+  if (!process.env.FIREBASE_WEB_API_KEY) {
+    throw new Error("FIREBASE_WEB_API_KEY is required for email/password login");
+  }
+  return process.env.FIREBASE_WEB_API_KEY;
 }
 
-function sendAuth(res, user, status = 200) {
+async function signInWithPassword(email, password) {
+  const apiKey = requireWebApiKey();
+  const response = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email,
+        password,
+        returnSecureToken: true,
+      }),
+    },
+  );
+
+  const data = await response.json();
+  if (!response.ok) {
+    const error = new Error(data.error?.message || "Firebase login failed");
+    error.status = 401;
+    throw error;
+  }
+
+  return data;
+}
+
+async function findOrCreateMongoUser(firebaseUser, defaults = {}) {
+  const email = firebaseUser.email?.toLowerCase();
+  if (!email) {
+    const error = new Error("Firebase user email is required");
+    error.status = 400;
+    throw error;
+  }
+
+  const user = await User.findOneAndUpdate(
+    { email },
+    {
+      $set: {
+        firebaseUid: firebaseUser.uid,
+        name: defaults.name || firebaseUser.displayName || email.split("@")[0],
+        phone: defaults.phone ?? "",
+        address: defaults.address ?? "",
+      },
+      $setOnInsert: {
+        role: defaults.role || "customer",
+        tag: defaults.tag || "Homeowner",
+        joinedAt: new Date(),
+      },
+    },
+    { new: true, upsert: true, setDefaultsOnInsert: true },
+  );
+
+  return user;
+}
+
+function sendAuth(res, user, firebaseSession, status = 200) {
   return res.status(status).json({
-    token: signToken(user),
+    token: firebaseSession.idToken,
+    refreshToken: firebaseSession.refreshToken,
+    expiresIn: firebaseSession.expiresIn,
     user: user.toAuthJSON(),
   });
 }
@@ -31,22 +83,38 @@ export async function register(req, res, next) {
       return res.status(400).json({ message: "Password must be at least 6 characters" });
     }
 
-    const existing = await User.findOne({ email: email.trim().toLowerCase() });
+    const normalizedEmail = email.trim().toLowerCase();
+    const existing = await User.findOne({ email: normalizedEmail });
     if (existing) {
       return res.status(409).json({ message: "An account already exists for this email" });
     }
 
-    const user = new User({
+    let firebaseUser;
+    try {
+      firebaseUser = await firebaseAdmin.auth().createUser({
+        email: normalizedEmail,
+        password,
+        displayName: name,
+      });
+    } catch (error) {
+      if (error.code === "auth/email-already-exists") {
+        firebaseUser = await firebaseAdmin.auth().getUserByEmail(normalizedEmail);
+      } else {
+        throw error;
+      }
+    }
+
+    const user = await User.create({
+      firebaseUid: firebaseUser.uid,
       name,
-      email,
+      email: normalizedEmail,
       phone,
       address,
       role: "customer",
-      password,
     });
 
-    await user.save();
-    return sendAuth(res, user, 201);
+    const firebaseSession = await signInWithPassword(normalizedEmail, password);
+    return sendAuth(res, user, firebaseSession, 201);
   } catch (error) {
     next(error);
   }
@@ -60,12 +128,12 @@ export async function login(req, res, next) {
       return res.status(400).json({ message: "Email and password are required" });
     }
 
-    const user = await User.findOne({ email: email.trim().toLowerCase() }).select("+passwordHash");
-    if (!user || !(await user.comparePassword(password))) {
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
+    const normalizedEmail = email.trim().toLowerCase();
+    const firebaseSession = await signInWithPassword(normalizedEmail, password);
+    const firebaseUser = await firebaseAdmin.auth().getUser(firebaseSession.localId);
+    const user = await findOrCreateMongoUser(firebaseUser);
 
-    return sendAuth(res, user);
+    return sendAuth(res, user, firebaseSession);
   } catch (error) {
     next(error);
   }
